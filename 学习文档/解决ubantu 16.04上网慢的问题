@@ -1,0 +1,96 @@
+在ubuntu下用firefox等浏览器上网,往往比在windows下上网要慢好多,但细心的人会发现,慢的时间是花在DNS查找上面了。那么我们可以在本机缓存DNS,也就是在本机架设一个DNS代理服务器。常用的软件有bind、djbdns、dnsmasq和pdnsd。下面我们来说一下,用pdnsd来架设一个永久的DNS代理服务器,所谓“永久”,就是说,在系统重启以后,本机缓存的DNS仍然存在,不用再去查找真实DNS来重新建立缓存。
+
+1、安装
+
+sudo apt-get install pdnsd
+
+安装的时候,它会问你选择什么配置,请选择“manual“。
+开始时进行测速记住时间，执行下面命令进行测速
+
+dig www.baidu.com | grep time
+
+2、配置pdnsd
+
+sudo gedit /etc/pdnsd.conf
+
+修改
+
+server {
+
+    label="resolvconf";
+
+}
+
+为
+
+server {
+
+    label="OpenDNS";
+
+    ip=208.67.222.222;
+
+    ip=208.67.220.220;
+
+    timeout=30;
+
+    interval=30;
+
+    uptest=ping;
+
+    ping_timeout=50;
+
+    purge_cache=off;
+
+}
+
+label="OpenDNS";
+
+其中“OpenDNS”可以随便写,一个标识而已,用于将来的诊断;
+
+ip=208.67.222.222;
+
+ip=208.67.220.220;
+
+这两行也可以写成一行ip=208.67.222.222,208.67.220.220;代表真实的DNS服务器地址,可以有多个。
+
+后面的参数采用默认就可以了。
+
+sudo gedit /etc/default/pdnsd
+
+修改START_DAEMON的值为yes。
+
+3、向resolver添加DNS代理服务器
+
+sudo gedit /etc/resolv.conf
+
+在首行添加一句:nameserver 127.0.0.1
+
+4、防止resolv.conf被覆盖
+
+如果你启用了DHCP服务,那么要
+
+sudo gedit /etc/dhcp3/dhclient.conf
+
+去掉
+
+#prepend domain-name-servers 127.0.0.1;
+
+前面的“#“。
+
+如果你是拨号上网,那么
+
+sudo gedit /etc/ppp/peers/provider 
+
+在 usepeerdns 前面增加# ,也就是把这条语句注释掉。 以防resolv.conf的设置被pppoe覆盖。
+
+5、启动pdnsd
+
+sudo /etc/init.d/pdnsd start
+
+6、测试
+
+dig www.baidu.com | grep time
+
+结果显示:;; Query time: 1 msec
+
+原来的结果:;; Query time: 845 msec

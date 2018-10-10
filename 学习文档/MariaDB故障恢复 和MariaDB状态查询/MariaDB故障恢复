@@ -1,0 +1,29 @@
+一.数据修复
+1.节点全部断开后恢复数据以事物节点最大者恢复，小事物恢复导致部分数据丢失
+2.如何查询事物大小：在mysql命令行中执行 SHOW STATUS LIKE 'wsrep_last_committed'; value显示事物节点，在各台服务器中都执行，选择事务最大节点之后
+就可以选定在该节点上重新恢复集群
+自动恢复：SET GLOBAL wsrep_provider_options='pc.bootstrap=YES';（执行这个sql之后，该节点会作为一个新的集群节点，其他节点会以此同步他们自己的状态，完成同步。）
+手动恢复：
+停掉所有服务
+service mysql stop
+在事务最大的节点A上，重新启动一个新的集群
+service mysql start --wsrep-new-cluster
+启动其他节点
+service mysql start
+手动启动之后，其他节点将以A节点的状态快照为准，完成集群的同步。此种方式恢复可能比较慢。（事务差距大的情况下）
+
+
+
+二.宕机恢复
+galera断电后无法重建集群（解决方法）
+把所有节点数据库服务关闭，选择一个节点，执行：
+sed -i 's/safe_to_bootstrap: 0/safe_to_bootstrap: 1/g' /var/lib/mysql/grastate.dat
+mysqld_safe --wsrep-new-cluster
+然后等待逐个启动所有节点数据库，等待几十秒就可以看到数据库恢复正常。
+
+
+
+
+
+
+

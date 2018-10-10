@@ -1,0 +1,94 @@
+前言：
+elasticsear安装依赖java，因此需要先安装java，yum install java* ，检查版本Java -version
+简单配置
+vim /etc/profile
+
+在尾部加上
+
+export JAVA_HOME=/usr/lib/jvm/java-1.7.0-openjdk-1.7.0.91.x86_64
+export CLASSPATH=.:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+export PATH=$PATH:$JAVA_HOME/bin
+保存退出后使用命令更新配置
+
+source /etc/profile
+
+1.安装elasticsear-6.0.1
+	参考链接:https://www.cnblogs.com/shifu204/p/6370682.html
+	
+	推荐使用下载rpm包安装方式
+	1)百度elasticsearch,点击官网网址
+	2)点击Downloads，选择past releases
+	3)找到6.0.1的版本，（由于elasticsearch更新太快，插件更新进度跟不上，2.3.5的版本插件最齐全）
+	4)右键点击RPM选择 -- 复制连接地址
+	5)在根目录下载rmp包
+	wget https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-6.0.1.rpm
+	6)直接解压安装，超级方便，一步到位
+	rpm -ivh elasticsearch-2.3.5.rpm 
+
+	systemctl daemon-reloa
+	7)启动并查看安装状态
+	systemctl start elasticsearch
+
+	systemctl status elasticsearch
+	8)本地查看版本信息
+
+	curl -XGET "127.0.0.1:9200"
+	9)查找elasticsearch 安装路径与配置路径，并且配置
+
+	whereis elasticsearch
+
+	cd /etc/elasticsearch
+
+	vim /etc/elasticsearch/elasticsearch.yml
+
+	修改内容:
+	network.host:172.18.113.108
+	http.port:9200
+
+	保存退出后重启elasticsearch
+
+	systemctl restart elasticsearch
+
+	在浏览器访问虚拟机172.18.113.108:9200
+
+2.搭建elasticsearch集群
+	参考链接:https://blog.csdn.net/napoay/article/details/52202877
+
+	与搭建5.4的多机集群配置相似
+	1)
+	centos上的ip为172.18.113.108,设为master节点，配置如下：
+
+	cluster.name: my-application
+	node.name: node-111
+
+	network.host: 172.18.113.108
+	http.port: 9200
+
+	http.cors.enabled: true
+	http.cors.allow-origin: "*"
+
+	node.master: true
+	node.data: true
+	discovery.zen.ping.unicast.hosts: ["172.18.113.108"]
+	
+	2)
+	另一台centos服务器的ip位172.18.113.111，配置如下：
+
+
+	cluster.name: my-application
+	node.name: node-102
+
+	network.host: 172.18.113.111
+	http.port: 9200
+
+	http.cors.enabled: true
+	http.cors.allow-origin: "*"
+
+	node.master: false
+	node.data: true
+	discovery.zen.ping.unicast.hosts: ["172.18.113.108"]
+
+
+3.另外elasticsearch-head浏览器访问地址为: localhost:9100
+
+4.另外需要注意的的是集群节点不能自动挂点,如果挂掉,kibana数据就查询不到了,三个节点的数据是互通的

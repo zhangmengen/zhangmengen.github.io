@@ -1,0 +1,107 @@
+启动服务::
+grunt server
+
+
+安装elasticsearch-head插件
+
+1.下载elasticsearch-head
+	git clone https://github.com/mobz/elasticsearch-head
+
+	报错:
+	fatal: 不能创建工作区目录 'elasticsearch-head': 权限不够
+
+	sudo git clone https://github.com/mobz/elasticsearch-head
+
+
+2.进入到elasticsearch-head目录下,运行 npm 指令:
+
+	cd elasticsearch-head/
+
+	npm install
+	
+	1）
+	注意，运行前，先要保证系统里面有 grunt 开发环境，笔者安装的时候，还出现了 node 版本问题导致的错误，建议安装最新的 node 版本。
+
+	如果安装过慢，可以通过代理来安装：
+
+	npm install cnpm --registry=https://registry.npm.taobao.org　
+
+	如果报错:
+	Please try running this command again as root/Administrator
+
+	用sudo执行
+	sudo npm install
+	
+	2）如果npm install报错：
+	npm: relocation error: npm: symbol SSL_set_cert_cb, version libssl.so.10 not defined in file libssl.so.10 with link time reference
+	
+	执行下面代码：
+	
+	openssl的版本问题吧 
+	yum update openssl 试试
+
+3.指令执行完之后，可以启动服务
+
+	$ grunt server
+
+	打开浏览器，如果未连接：
+	****注意:
+	浏览器elasticsearch-head接口地址:http://localhost:9100/
+	*****
+
+	可以发现，我们并没有连接上 ES。这个时候，需要我们去配置下elasticsearch.yml文件，在最后添加：
+
+	http.cors.enabled: true
+
+	http.cors.allow-origin: "*"
+
+	重启下elasticsearch，刷新下打开 elasticsearch-head 的页面，就可以了.
+
+4.如果没有安装grunt,通过以下命令安装
+	sudo apt-get install -y nodejs
+
+	安装CLI
+	sudo npm install -g grunt-cli
+
+	参考链接:https://blog.csdn.net/formyth/article/details/42389611
+
+
+
+===============================================
+elasticsearch测试环境:
+http://172.18.113.113:9200/
+
+
+5.本地搭建elasticsearch服务器流程:
+	参考:https://jingyan.baidu.com/article/c45ad29c10b013051753e2be.html
+	***注意:
+	启动elasticsearch需要进入elasticsearch-5.4.0目录下
+
+	cd elasticsearch-5.4.0/
+
+	./bin/elasticsearch
+
+
+	我们再来简单的进行一下查询，看看是否可用。
+
+	curl -XGET "localhost:9200/_search"
+
+	****浏览器地址:http://localhost:9200/
+
+	{
+	  "name" : "SbIYmp_",
+	  "cluster_name" : "elasticsearch",
+	  "cluster_uuid" : "6r73By6OQgSPnqzMKPYQdw",
+	  "version" : {
+	    "number" : "5.4.0",
+	    "build_hash" : "780f8c4",
+	    "build_date" : "2017-04-28T17:43:27.229Z",
+	    "build_snapshot" : false,
+	    "lucene_version" : "6.5.0"
+	  },
+	  "tagline" : "You Know, for Search"
+	}
+
+	执行完成后，你会看到返回的一个查询结果，这样我们就正式安装成功并跑起来了服务器，接下来就可以愉快的进行ES的学习和探索了。
+
+

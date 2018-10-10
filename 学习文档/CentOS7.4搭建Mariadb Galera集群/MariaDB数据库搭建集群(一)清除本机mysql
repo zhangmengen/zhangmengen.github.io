@@ -1,0 +1,37 @@
+一.卸载本机mysql
+查看已经安装的服务 
+
+1.yum方式
+查看yum是否安装过mysql
+yum list installed mysql*
+yum卸载 ：
+yum remove 加查询到的包全部删除
+2.rpm查看安装
+rpm –qa|grep -i mysql 
+rpm 卸载
+rpm -e mysql57-community-release-el7-9.noarch
+
+
+rm -rf /var/lib/mysql
+rm /etc/my.cnf
+查看是否还有mysql软件：
+rpm -qa|grep mysql
+有的话继续删除
+
+
+3.查看残留的目录：
+whereis mysql
+然后删除mysql目录：(有mysql的全部删除，但是只删除mysql不要删除包含他的目录文件)
+
+rm –rf /usr/lib64/mysql 
+删除相关文件： 
+rm –rf /usr/my.cnf
+rm -rf /root/.mysql_sercret  
+最关键的：
+rm -rf /var/lib/mysql
+
+执行完毕后执行下列命令
+1.yum clean all
+2.yum makecache
+3.yum update 
+

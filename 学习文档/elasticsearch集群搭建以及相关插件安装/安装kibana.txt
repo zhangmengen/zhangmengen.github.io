@@ -1,0 +1,31 @@
+***kibana安装，kibana的版本必须与elasticsearch版本一致
+
+另外，Kibana的安装和Logstash一样极其简单，而且不需要在每个客户端都安装，通常想让哪台服务器作为展示就用哪台安装一个kibana，Kibana是从Elasticsearch中获取数据的，即使安装在Elasticsearch集群之外的节点也是没有问题的 
+
+1.从官网下载kibana
+wget https://artifacts.elastic.co/downloads/kibana/kibana-6.3.0-linux-x86_64.tar.gz
+
+解压：tar zvxf kibana-6.3.0-linux-x86_64.tar.gz
+
+2配置：
+	cd kibana-6.3.0-linux-x86_64
+
+	然后到kibana安装目录的config下，编辑kibana.yml配置文件，添加如下配置：
+
+	#配置本机ip
+	server.host: "0.0.0.0"
+	#配置es集群url
+	elasticsearch.url: "http://10.100.101.172:9200"
+
+3.Kibana 启动
+
+	切换到kibana安装目录的bin目录下，执行kibana文件
+
+	cd /run/kibana-5.5.2-linux-x86_64/bin
+
+	./kibana &
+
+	主要使用&命令启动后，退出当前窗口时需要使用exit退出
+
+	成功启动后，可以访问：http://10.100.101.172:5061 来访问kibana，ip为kibana安装节点ip，端口默认为5061，可以在config/kibana中配置
+4.访问：http://10.100.101.172:5061

@@ -1,0 +1,18 @@
+因pip是国外源导致安装慢
+解决方法:
+1、敲开终端
+
+2、敲命令
+
+~$ mkdir ~/.pip
+
+~$ vim ~/.pip/pip.conf
+
+按ENTER进入新的空白文件，当然这是建立在ubuntu装了vim编辑器的前提下
+
+3、编辑文件内容
+
+  [global]
+  index-url = http://mirrors.aliyun.com/pypi/simple
+  [install]
+  trusted-host=mirrors.aliyun.com

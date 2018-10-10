@@ -1,0 +1,24 @@
+1.创建/etc/yum.repos.d/MariaDB.repo文件（官方镜像安装慢）用了阿里云镜像
+添加如下配置
+[mariadb]
+name = MariaDB
+baseurl = http://mirrors.ustc.edu.cn/mariadb/yum/10.3/centos7-amd64/
+gpgkey=http://mirrors.ustc.edu.cn/mariadb/yum/RPM-GPG-KEY-MariaDB
+gpgcheck=1
+
+2.配置完毕刷新yun缓存
+yum makecache
+
+3.查看Mariadb相关的安装包，注意软件包版本和对应的YUM源名字
+yum list MariaDB* galera
+
+4.设置主机名（设置三台虚拟机主机名分别为db1，db2，db3）每台服务器执行一条更改命令就行
+# hostnamectl set-hostname db1
+# hostnamectl set-hostname db2
+# hostnamectl set-hostname db3
+
+5.编辑/etc/hosts文件
+# vim /etc/hosts
+172.16.10.101    db1
+172.16.10.102    db2
+172.16.10.103    db3

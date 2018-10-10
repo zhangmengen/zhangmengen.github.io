@@ -1,0 +1,807 @@
+
+
+
+安装jdk
+安装java8之上的 百度搜java 官网  linuxX64
+检查是否安装成功，java -version
+
+如果在ubuntu中安装了，卸载java jdk
+
+
+
+1、安装 elasticsearch-rtf  可以到github上搜索
+
+
+2、head插件和kibana的安装
+
+head就想当与navcat ，基于浏览器的，
+可以在github上搜索，elasticsearch-head，查看安装方式，npm 是nodejs的包管理器，安装nodjs 安装了可以查看npm -l  ，用npm下载速度非常慢
+cnpm 百度搜索，其实是淘宝npm的一个镜像，http://npm.taobao.org/       npm install -g cnpm --registry=https://registry.npm.taobao.org
+
+npm都可以换成cnpm运行
+
+
+安装完成之后，可以在127.0.0.1:9100观察，连接到127.0.0.1:9200会显示未连接，（el的安装策略，默认是不允许使用第三方的服务，head是第三方的插件，可理解为代理）
+
+然后再elasticsearch的coning配置文件中的yml文件中，查看手机的截图，配置的内容
+http.cors.enabled: true
+http.cors.allow-origin: "*"
+http.cors.allow-methods: OPTIONS, HEAD, GET, POST, PUT, DELETE
+http.cors.allow-headers: "X-Requested-With, Content-Type, Content-Length, X-User"
+
+然后再连接，就可以连接成功了。
+
+
+kibana安装：
+可参考：https://blog.csdn.net/eff666/article/details/63251710?locationNum=3&fps=1
+kibana中的sense插件，做elasticsearch交互的，sense属于kibana中的一部分，http://www.elastic.co/downloads/kibana，必须与elasticsearch(点击信息，信息)版本对应，需要点击past releases.
+
+下载下来得bin目录下的第一个，可以直接运行，运行的端口，127.0.0.1:5601运行，DevTools  
+
+
+elasticsearch的概念：
+	集群：一个或者多个节点组织在一起（比如有三台服务器，这三台服务器加在一起）
+	节点：一个节点是集群中的一个服务器，由一个名字来标识，默认是一个随机的漫画角色的名字（每一台服务器都有elasticearch,就叫节点）
+	分片：将索引（数据库）划分为多份的能力，允许水平分割和扩展内容，多个分片响应请求，提高性能和吞吐量（将过大的数据，分成多份，放在不同的地方）
+	副本：创建分片的一份或多份的能力，在一个节点失败其余节点可以顶上（复制几份）
+
+elasticsearch               mysql
+
+ index（索引）             数据库
+ type(类型)                  表
+ documents（文档）           行
+ fields                      列
+ 
+documents（文档，就是一条数据） 
+index 作为一个名词，就是一个数据库
+	  作为一个动词，就是作为一个插入 inter的操作（比如，将一个文档，进行索引的时候，就是将这个数据插入的时候）
+	  
+
+	  
+Http方法：
+
+http1.0定义三种请求方式：GET,POST HEAD方法
+
+增加了五种方法：options\put\delete\trace\connect
+
+get方法：请求指定的页面信息，并返回实体主体
+
+post方法：向指定资源提交数据进行处理请求，数据被包含在请求体中，post请求可能会导致新的资源的建立和、或已有资源的修改
+
+put方法：向服务器传送的数据取代指定的文档的内容
+
+delete方法:请求服务器删除指定的页面
+
+
+倒排索引：
+倒排索引源于实际应用中需要根据属性的值来查找记录。这种索引表中的每一项都包括一个属性值和具有该属性值的各记录的地址。由于不是由记录来确定属性值，而是由属性值来确定记录的位置，因而称为倒排索引(inverted index)。带有倒排索引的文件我们称为倒排索引文件，简称倒排文件(inverted file)。
+
+目前的搜索引擎中，一般底层的索引存储，都是采用的是倒排索引
+
+例如：
+	文件A：通过python django搭建网站
+	文件B：python scrapy 爬取网站数据
+	文件C：scrapy_redis 分布式爬虫
+
+	我要遍历A，B,C文件中，所有的内容才知道有没有出现过python，（为什么要遍历所有，因为这个python有可能在最后）
+	如果文件上亿额时候，我不可能遍历所有的文件
+	倒排索引，就是在文件存储之前，先对A文件进行分析，（分析，就包括了分词，），一下就是倒排处理之后的样子；
+	
+	关键词        倒排列表
+	python         （文章1，《2,10》，2）   意思就是在文章1中的2,10位置上，共出现了2次
+	
+
+（TF-IDF）是elasticsearch打分的一个关键技术
+
+倒排索引待解决的问题：（elasticsearch都帮我们完成了）
+1、大小写转换的问题，如python和PYTHON应该为一个词
+2、词干抽取，looking和look应该处理为一个词
+3、分词，若屏蔽系统应该分词为‘屏蔽’、‘系统’还是用应该为‘屏蔽系统’
+4、倒排索引文件过大-压缩编码
+
+elasticsearch的基础操作：
+
+	都是在kibana中操作的
+	在Dev Tools中，es文档，索引的CRUD操作（CRUD，是对文档的增删改查操作）
+	#索引初始化操作（可理解为创建一个数据库）
+	#指定分片和副本的数量
+	#shards一旦设置是不能修改的
+
+以下为创建索引：
+
+PUT lagou（相当于关系数据库的sql语句，必须掌握的）
+{
+  "settings": {
+    "index":{
+      "number_of_shards":5,(分片的数量不能修改)
+      "number_of_replicas":1(副本的数量可以修改)
+    }
+  }
+}	
+如何获取setting信息（获取setting就是获取索引信息）：
+
+GET lagou/_setting   获取lagou索引中setting中的信息
+GET _all/_setting  获取所有索引的setting中的信息
+GET .kibana,lagou/_setting          获取某一些索引的信息
+
+GET _setting 等效于GET _all/_setting  
+
+#修改setting：
+PUT lagou/_setting
+{
+’number_of_replicas‘:2(将副本信息改为2)
+}
+
+
+获取所有的index索引：
+GET _all
+GET lagou (获取拉钩的索引)
+
+保存一个职位信息，到这个索引中：
+
+相当于nosql，不用提前定义表，不用定义type，就可以放数据
+#保存文档(可以在head中查看) 
+PUT lagou/job(表名，type)/1（数据的id，也可以不指定id会自动生uuid）
+{
+	’title‘:'python分布式爬虫开发'，
+	’salary_min‘:15000,
+	'city':'北京'，
+	’company‘:{
+		'name':'百度'，
+		’company_addr‘:'北京市'
+	},
+	’publish_date‘:'2017-4-16',
+	'comments':15
+}
+
+获取文档：GET lagou/job/1
+只获取title：GET lagou/job/1?_source=title
+获取title,city: GET lagou/job/1?_source=title,city
+获取所有：GET lagou/job/1?_source
+
+
+修改文章：（需要指明id，是一种覆盖的方式）
+
+PUT lagou/job(表名，type)/1（数据的id，也可以不指定id会自动生uuid）
+{
+	’title‘:'python分布式爬虫开发'，
+	’salary_min‘:15000,
+	'city':'北京'，
+	’company‘:{
+		'name':'百度'，
+		’company_addr‘:'北京市'
+	},
+	’publish_date‘:'2017-4-16',
+	'comments':15
+}
+第二种修改文章的方式：(推荐)
+POST lagou/job/1/_update
+{
+	'doc':{
+		'comments':20
+	}
+	
+}
+
+
+#删除 文档
+
+DELETE algou/job/1
+
+DELETE algou/job(删除的是整个的type)
+
+DELETE algou（删除索引）
+
+
+elasticsearch之bulk批量操作：
+其中包括批量的获取，以及批量的bulk（可以进行增删改）操作
+
+批量获取：(如果通过之前的get获取之前的某个document时候，查询过多的时候，效率比较低的。每次需要建立http的连接，获取数据，开销比较大（每次需要建立三次握手）)
+
+GET _mget
+{
+	‘docs’:[
+		{'_index':'testdb', 需要指明index
+		'_type':'job1',      需要指明type
+		'_id':1
+		},
+		{'_index':'testdb',
+		'_type':'job2',
+		'_id':2
+		}
+
+	]
+
+}
+
+方法二：
+
+GET testdb/_mget
+{
+	‘docs’:[
+		{
+		'_type':'job1',      需要指明type
+		'_id':1
+		},
+		{
+		'_type':'job2',
+		'_id':2
+		}
+
+	]
+
+}
+
+
+方法三：
+GET testdb/job1/_mget
+{
+	‘docs’:[
+		{
+		'_id':1
+		},
+		{
+		'_id':2
+		}
+	]
+}
+
+方法四：(index,type都相同)
+
+GET testdb/job1/_mget
+{
+	‘ids’:[1,2]
+
+}
+
+bulk批量操作：
+批量导入可以合并多个操作，比如index，delete，update，create等等，也可以帮我们从一个索引导入到另外一个索引中
+
+action_and_meta_data\n 
+optional_source\n 
+
+action_and_meta_data\n 
+optional_source\n 
+
+action_and_meta_data\n 
+optional_source\n 
+
+需要注意的是，每一条数据都由两行构成（delete除外），其他的命令比如index和create都是有元信息行和数据行组成，update比较特殊他的数据行可能是doc也可能是upser或者
+是script，如果不了解的朋友可以参考前面的update的翻译
+
+批量插入：
+POST _bulk
+{'index':{'_index':'lagou','_type':'job2','_id':2}}
+{'title':'python','salary_min':3000,'city':'成都','company‘:{'name':'阿里巴巴'，‘addr’:'北京'}}
+
+{'index':{'_index':'lagou','_type':'job2','_id':2}}
+{'title':'python','salary_min':3000,'city':'北京','company‘:{'name':'阿里巴巴'，‘addr’:'北京'}}
+
+格式：
+{'index':{'_index':'test','_type':'job2','_id':2}}
+{‘field1’：‘value1’}
+
+{'delete':{'_index':'test','_type':'job2','_id':2}} 删除只有一行
+
+
+{'create':{'_index':'test','_type':'job2','_id':2}}
+{‘field1’：‘value1’}
+
+{'update':{'_index':'test','_type':'job2','_id':2}}
+{‘field1’：‘value1’}
+
+
+elasticsearch之mapping映射操作：
+映射（mapping）（相当于定义每个字段的类型）
+映射：就是在创建索引的时候，可以预先定义字段的类型以及相关的属性
+
+elasticsearch会根据json源数据的基础类型猜测你要的字段映射，将输入的数据转变成为可搜索的索引项，mapping就是我们自己定义的字段的数据类型，同时
+告诉elasticsearch如何索引数据以及是否可以被索引
+
+作用：会让索引简历的更加细致和完善
+类型：静态映射和动态映射
+
+
+内置类型：
+string类型：text(会进行分析，会抽取分词，)，keyword（会进行字符串进行存储）(string 类型在es5开始已经废弃)
+数字类型：long integet ,short,byte double float
+日期类型：date 可以解析datetime（python中的datetime）
+bool类型：boolean
+binary类型：（二进制类型,二进制类型不会被检索的）binary
+复杂类型：object，nested
+geo类型（地理位置）：geo-point（通过经纬度）, geo-shape（通过多点标识一个片区）
+
+专业类型：ip competion（做搜索建议的）
+
+
+{
+	’title‘:'python分布式爬虫开发'，
+	’salary_min‘:15000,
+	'city':'北京'，
+	’company‘:{                      company就是object对象
+		'name':'百度'，
+		’company_addr‘:'北京市'，
+		‘emplyee’:[                     emplyee就是一个nested类型
+		{
+		'name':'你好'，
+		‘age’:20
+		},
+				{
+		'name':'你好'，
+		‘age’:20
+		}
+
+		]
+	},
+	’publish_date‘:'2017-4-16',
+	'comments':15
+}
+
+
+常用的属性：
+
+属性                                描述                              适合类型
+store                    值为yes表示存储，为no表示不存储，默认为no      all
+index                    yes表示分析，no表示不分析，默认值为true        string 
+null_value              如果字段为空，可以设置一个默认的值，比如‘NA’    all
+analyzer                可以设置索引和索引时用到的分析器，默认使用的是   all
+						standard分析器，还可以使用whitespace，
+						simple，English
+
+include_in_all         默认是es为每个文档定义一个特殊域_all,他的作用是让每个字段被
+						搜索到，如果不想某个字段被搜索到，可以设置false             all
+						
+format                 时间格式字符串模式                                  date
+
+
+{
+   "library": {
+      "mappings": {
+         "jobs": {
+            "properties": {
+               "name": {
+                  "type": "text"
+               },
+               "salary_min": {
+                  "type": "integer"
+               },
+               "city": {
+                  "type": "keyword"
+               },
+               "publish_date": {
+                  "type": "date",
+                  "format": "dateOptionalTime"
+               },
+               "title": {
+                  "type": "string"
+               }
+            }
+         }
+      }
+   }
+}
+
+获取mapping
+GET lagou/_mapping/job
+GET _all/_mapping
+
+
+
+elasticsearch之查询搜索1：
+elasticsearch是功能非常强大的搜索引擎，使用它的目的是为了快速的查询到需要的数据
+
+查询分类：
+	基本查询：elasticsearch内置查询条件进行查询（参与打分）
+	组合查询：把多个查询组合在一起进行复合查询（参与打分）
+	过滤：查询同时，通过filter条件在不影响打分的情况下筛选数据
+
+基本查询：
+#添加映射：
+PUT lagou 
+{
+	'mappings':{
+		'job':{
+			'properties':{
+				'title':{
+					'store':true,
+					'type':'text',
+					'analyzer':'ik_max_word'
+				},
+				'company_name':{
+					'store':true,
+					'type':'keyword' 设置为keyword就不会被分析器分析，也不会分词
+				},
+				'desc':{
+					'type':'text'
+				},
+				‘comments’:{
+					'type'：‘text’
+				},
+				'add_time':{
+					'type':'date',
+					'format':'yyy-mm-dd'
+				}
+			}
+
+		}
+
+	}
+}
+
+添加数据：
+POST lagou/job 
+{
+	'title':'python',
+	'company_name':'百度',
+	'desc':'hhhhhhhhhh',
+	'comments':5,
+	'add_time':'2017-8-9'
+
+
+}
+
+#match查询：对我们的输入进行分词
+GET lagou/_search
+{
+	'query':{
+		'match':{
+			'title':'python'  去找我们这个字段有没有这个分词
+		}
+	}
+
+
+}
+
+
+
+#term查询,
+GET lagou/_search
+{
+	'query':{
+		'term':{
+			'title':'python'  对搜索不会进行解析的，搜什么就是什么
+		}
+	}
+
+
+}
+
+
+
+#terms查询,
+GET lagou/_search
+{
+	'query':{
+		'term':{
+			'title':['python' ,'java','c'] 有一个匹配就会返回回来
+		}
+	}
+
+
+}
+
+
+#控制查询的返回数量
+GET lagou/_search
+{
+	'query':{
+		'term':{
+			'title':‘python’
+		}
+		
+	},
+	'from':1,
+	'size':2
+
+}
+
+
+#match_all 查询
+GET lagou/_search
+{
+	'query':{
+	‘match_al’：{}
+
+}
+
+# match_phrase查询：
+#短语查询
+GET lagou/_search
+{
+	'query':{
+		' match_phrase':{
+			'title':{
+				‘query’:'python系统',   必须满足所有词才会返回结果
+				'slop':6                两个词之间的距离
+			}
+		}
+		
+	},
+}
+
+
+
+# multi_match查询：
+#比如可以指定多个字段
+#比如查询title和desc这两个字段里面包含python的关键词文档
+GET lagou/_search
+{
+	'query':{
+		' match_phrase':{
+			'title':{
+				‘query’:'python系统',   
+				'fields':['title3','desc']        上尖号3表示增加权重     
+			}
+		}
+	}
+}
+
+#指定返回的字段有哪些
+
+
+
+GET lagou/_search
+{
+	‘stored_fields’:['title','company_name']   指定的字段
+	'query':{
+		' match_phrase':{
+			'title':{
+				‘query’:'python系统',  
+			}
+		}
+		
+	},
+}
+
+
+通过sort把结果排序
+
+GET lagou/_search
+{
+	'query':{
+		‘match_all’:{}
+	},
+	'sort':[{
+		'comments':{
+			'order':'asc'
+		}
+	}
+	
+	]
+}
+
+#查询范围
+#range查询
+
+GET lagou/_search
+{
+	'query':{
+		‘range’:{
+			'comments':{
+				'gte':10,
+				'lte':20,
+				'boost':2.0	
+			}
+		}
+	}
+}
+
+#wildcard 模糊查询
+GET lagou/_search
+{
+	'query':{
+		‘wildcard’:{'title':{'value':'pyth*n','boost':2.0}}
+	
+	}
+}
+
+elasticsearch之组合查询：
+bool查询
+老版本的filtered已经被bool替换
+bool包括，must，should must_not  filter来完成
+
+格式如下：
+bool：{
+	‘filter’：[],   就是字段的过滤，不参与打分的
+	'must':[],      数组里边的查询，必须全部满足
+	'should':[],    与must相反，只要满足一个或者多个就可以
+	'must_not':[],   与must完全相反，一个都不满足
+}
+
+# 建立测试数据
+
+POST lagou/textjob/_bulk
+{'index':{'_id':1}}
+{'salary':10, 'title':'python'}
+{'index':{'_id':2}}
+{'salary':20, 'title':'python'}
+{'index':{'_id':3}}
+{'salary':30, 'title':'python'}
+{'index':{'_id':4}}
+{'salary':40, 'title':'python'}
+
+
+# 简单过滤查询
+
+#最简单的filter查询
+#select * from testjob where salary=20
+#薪资为20k的工作
+
+GET lagou/testjob/_search
+{
+	'query':{
+		'bool':{
+			'must':{
+				'match_all':{}
+			},
+			'filter':{
+				'term':{
+					'salary':20
+				}
+			}
+		}
+	}
+}
+
+#也可以指定多个值
+
+GET lagou/testjob/_search
+{
+	'query':{
+		'bool':{
+			'must':{
+				'match_all':{}
+			},
+			'filter':{
+				'terms':{
+					'salary':[10,20]
+				}
+			}
+		}
+	}
+}
+
+
+
+
+GET lagou/testjob/_search
+{
+	'query':{
+		'bool':{
+			'must':{
+				'match_all':{}
+			},
+			'filter':{
+				'term':{  # term 不会做预处理，写是什么就查什么，match就可以查到
+					'title':'Python' # title是string类型，在入库会做预处理，全部转换成小写 ，所以查询不到
+				}
+			}
+		}
+	}
+}
+
+
+# 查看分析器解析的结果
+GET _analyze
+{
+	'analyzer':'ik_max_word',        ik_smart 分成最少的词
+	'text':'python网络开发工程师'    可以分词
+
+
+}
+
+# bool过滤查询，可以做组合过滤查询
+
+#select * from testjob where (salary=20 or title=python) and (salary !=30)
+# 查询薪资等于20k或者python工作，排除价格为30k
+
+
+GET lagou/testjob/_search
+{
+	'query':{
+		'bool':{
+			'should':[
+				{'term':{'salary:20'}},
+				{'term':{'title':'python'}}
+			],
+			'must_not':{
+				'term':{ 
+					'price':30 
+				}
+			}
+		}
+	}
+}
+
+
+
+#嵌套查询
+#select * from testjob where title='python' or title='django' and salary=30
+
+#过滤空和非空
+#建立测试数据
+
+POST lagou/textjob2/_bulk
+{'index':{'_id':1}}
+{'tags':['search']}
+{'index':{'_id':2}}
+{'tags':['search','python']}
+{'index':{'_id':3}}
+{'other_field':['some data']}
+{'index':{'_id':4}}
+{'tags':null}
+{'index':{'_id':5}}
+{'tags':['search', null]}
+
+# 处理null的方法
+# select tags from testjob2 where tags is not NULL
+
+GET lagou/testjob/_search
+{
+	'query':{
+		'bool':{
+			'filter':{
+				'exists':{
+					'field':'tags'
+				
+				}
+			}
+		}
+	}
+}
+
+
+GET lagou/testjob/_search
+{
+	'query':{
+		'bool':{
+			'must_not':{
+				'exists':{
+					'field':'tags'
+				
+				}
+			}
+		}
+	}
+}
+
+
+
+# 爬虫爬取的数据存储到es中
+
+Elasticsearch DSL
+
+
+    def process_item(self, item, spider):
+        article = Article()
+        article.title = item["title"]
+        article.create_date = item["create_date"]
+        article.content = remove_tags(item["content"]).strip().replace("\r\n","").replace("\t","")
+        article.front_image_url = item["front_image_url"]
+        # article.front_image_path = item["front_image_path"]
+        article.praise_nums = item["praise_nums"]
+        article.comment_nums = item["comment_nums"]
+        article.fav_nums = item["fav_nums"]
+        article.url = item["url"]
+        article.tags = item["tags"]
+        article.meta.id = item["url_object_id"]
+		
+        article.save()
+
+        return item
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-
+-

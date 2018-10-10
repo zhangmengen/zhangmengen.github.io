@@ -1,0 +1,120 @@
+注意：一步一个坑
+
+msyql备份：
+可以选在在跟目录中：
+ mysqldump --single-transaction --master-data=2 --all-databases -uroot -p > all.sql
+ 报错：
+ 	mysqldump: Error: Binlogging on server not active
+解决：
+	vi /etc/my.cnf
+	去掉mysqld下的log_bin前面的注释 并且改成
+	log_bin=mysql-bin
+	重启msyql：sudo systemctl restart mysqld
+
+mysql 修改密码的方法报错：Unknown column 'Password' in 'field list'
+	参考链接：https://www.cnblogs.com/wangbaobao/p/7087032.html
+	解决方法：update mysql.user set authentication_string=password('*******') where user='*******';  
+
+
+centos 中卸载mysql的方法：
+	参考网站：https://www.jb51.net/article/102928.htm
+
+	yum方式安装的MySQL
+
+	$ yum remove mysql mysql-server mysql-libs compat-mysql51
+	$ rm -rf /var/lib/mysq
+	$ rm /etc/my.cnf
+	查看是否还有mysql软件：
+	$ rpm -qa|grep mysql
+	如果存在的话，继续删除即可，删除方式：yum remove + 【名字】。
+
+报错：Job for mysqld.service failed because a timeout was exceeded. See "systemctl status mysqld.service" and "journalctl -xe" for details.
+参考网站：https://blog.csdn.net/u012496940/article/details/50676780
+命令：yum install mysql-community-server
+
+
+下载mha4mysql-manager和mha4mysql-node的网站：
+	https://code.google.com/archive/p/mysql-master-ha/downloads
+
+报错：Can't locate CPAN.pm in @INC (@INC contains: inc /usr/local/lib64/perl5 /usr/local/share/perl5 /usr/lib64/perl5/vendor_perl /usr/share/perl5/vendor_perl /usr/lib64/perl5 /usr/share/perl5 .) at inc/Module/AutoInstall.pm line 277.
+	参考网站：https://www.cnblogs.com/ctulzq/p/8658410.html
+	解决：yum install -y perl-CPAN
+
+msyql安装教程：
+    参考网站：https://www.cnblogs.com/silentdoer/articles/7258232.html
+
+报错：Please use --connect-expired-password option or invoke mysql in interactive mode.
+	  报这个错误需要从新设置密码：ALTER USER 'root'@'localhost' IDENTIFIED BY 'XXX';
+	  当在mysql交互中输入ALTER USER 'root'@'localhost' IDENTIFIED BY 'XXX';之后又报错
+	  ERROR 1819 (HY000): Your password does not satisfy the current policy requirements
+	  这个报错的参考网站：https://www.cnblogs.com/ivictor/p/5142809.html
+	  主要的操作两步：
+	  		set global validate_password_policy=0;  
+	  		set global validate_password_length=4; 
+
+报错：
+在-change master to master_host='172.18.113.111',master_user='zmj',master_password='123456', MASTER_LOG_FILE='mysql-bin.000001', MASTER_LOG_POS=120;
+时候报错如下：
+	ERROR 1794 (HY000): Slave is not configured or failed to initialize properly. You must at least set --server-id to enable either a master or a slave. Additional error messages can be found in the MySQL error log.
+	参考网站：https://alanhou.org/mysql-master-slave/
+	解决：vim /etc/my.cnf  中添加了server_id=1（但是我之前修改的密码123456不能用了，还是开始设置的mysql可以用了。不知道为什么）
+
+报错：
+	ERROR 1805 (HY000): Column count of mysql.user is wrong. Expected 45, found 43. The table is probably corrupted
+	解决：
+	mysql_upgrade -u root -p 13456
+
+报错：Slave_IO_Running: no
+	解决方法：首先查看log日志，vim /var/log/mysql.log 查看到底是什么原因，我出现的原因是master中没有设置server_id,
+	当设置了server_id之后
+	查看master，输入：show master status;
+	然后再各个slave中输入：
+	stop slave;
+	change master to Master_Log_File='mysql-bin.000005',Master_Log_Pos=120;
+	start slave;
+
+关闭防火墙：systemctl stop firewalld.service
+开放端口：iptables -I INPUT -p tcp --dport 8888 -j ACCEPT
+
+配置好之后再master查看：
+配置好了以后主库上会有slave过来的进程：
+  show processlist;
+
+ 执行报错：masterha_check_repl  --conf=/etc/mha/mysql_mha.cnf
+ 172.18.113.73(172.18.113.73:3306): User repl does not exist or does not have REPLICATION SLAVE privilege! Other slaves can not start replication from this host.
+
+ 解决：在master中创建repl复制用户，在故障转移的slave中也需要创建repl复制用户
+ grant replication slave on *.* to 'repl'@'172.18.113.%' identified by '123456'; 
+
+ auto.cnf文件的位置： 
+ /var/lib/mysql/auto.cnf
+ 参考网站：https://dba.stackexchange.com/questions/9756/mysql-thinks-master-slave-have-the-same-server-id
+
+
+当主服务器master，使用show slave status \G时候报错为：
+	The slave I/O thread stops because master and slave have equal MySQL server ids; these ids must be different for replication to work (or the --replicate-same-server-id option must be used on slave but this does not always make sense; please check the manual before using it).
+
+	主要是在开始，change的时候的ip不能是master的ip，必须是切换的备用主数据库的ip
+
+	参考网址：http://blog.xiao5tech.com/2016/09/22/063-mysql_master_master_error/
+
+
+
+执行报错：masterha_check_repl  --conf=/etc/mha/mysql_mha.cnf
+	报错： Multi-master configuration is detected, but two or more masters are either writable (read-only is not set) or dead! Check configurations for details. Master configurations are as below: 
+	在两个从服务器设置
+	mysql> set global read_only=1;
+	Query OK, 0 rows affected (0.03 sec)
+
+	mysql> show variables like 'read_only';
+	+---------------+-------+
+	| Variable_name | Value |
+	+---------------+-------+
+	| read_only     | ON    |
+	+---------------+-------+
+	参考网站：http://blog.itpub.net/88305/viewspace-730135/
+
+	报错：Multi-master configuration is detected, but two or more masters are either writable (read-only is not set) or dead! Check configurations for details. Master configurations are as below: 
+	解决：
+		set global read_only=1;
+		show variables like 'read_only';

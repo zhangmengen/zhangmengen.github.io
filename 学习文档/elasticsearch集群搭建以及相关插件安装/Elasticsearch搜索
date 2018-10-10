@@ -1,0 +1,919 @@
+索引文档
+通过使用 index API ，文档可以被索引 —— 存储和使文档可被搜索 。 但是首先，我们要确定文档的位置。正如我们刚刚讨论的，一个文档的 _index 、 _type 和 _id 唯一标识一个文档。 我们可以提供自定义的 _id 值，或者让 index API 自动生成
+
+1.如果你的文档有一个自然的标识符（例如，一个 user_account 字段或其他标识文档的值），你应该使用如下方式的 index API 并提供你自己 _id ：
+	举个例子，如果我们的索引称为 website ，类型称为 blog ，并且选择 123 作为 ID ，那么索引请求应该是下面这样：
+
+	PUT /website/blog/123
+	{
+	  "title": "My first blog entry",/
+	  "text":  "Just trying this out...",
+	  "date":  "2014/01/01"
+	}
+
+	Elasticsearch 响应体如下所示：
+	{
+	   "_index":    "website",
+	   "_type":     "blog",
+	   "_id":       "123",
+	   "_version":  1,
+	   "created":   true
+	}
+
+2.Autogenerating IDs
+	如果你的数据没有自然的ID， Elasticsearch可以帮我们自动生成ID。 请求的结构调整为： 不再使用PUT谓词(“使用这个 URL 存储这个文档”)， 而是使用POST谓词(“存储文档在这个 URL 命名空间下”)。
+	现在该URL只需包含 _index 和 _type :
+
+	POST /website/blog/
+	{
+	  "title": "My second blog entry",
+	  "text":  "Still trying this out...",
+	  "date":  "2014/01/01"
+	}
+
+	Elasticsearch 响应体如下所示：
+	{
+	   "_index":    "website",
+	   "_type":     "blog",
+	   "_id":       "AVFgSgVHUP18jI2wRx0w",
+	   "_version":  1,
+	   "created":   true
+	}
+	自动生成的ID是 URL-safe、 基于 Base64 编码且长度为20个字符的 GUID 字符串。 这些 GUID 字符串由可修改的 FlakeID 模式生成，这种模式允许多个节点并行生成唯一 ID ，且互相之间的冲突概率几乎为零。
+
+3.取回一个文档
+	(1)为了从 Elasticsearch 中检索出文档 ，我们仍然使用相同的 _index , _type , 和 _id ，但是 HTTP 谓词 更改为 GET :
+	GET /website/blog/123?pretty
+	GET 请求的响应体包括 {"found": true} ，这证实了文档已经被找到。 如果我们请求一个不存在的文档，我们仍旧会得到一个 JSON 响应体，但是 found 将会是 false 。 此外， HTTP 响应码将会是 404 Not Found ，而不是 200 OK 。
+	curl -i -XGET http://localhost:9200/website/blog/124?prett
+
+	显示响应头部的响应体现在类似这样：
+	HTTP/1.1 404 Not Found
+	Content-Type: application/json; charset=UTF-8
+	Content-Length: 83
+
+	{
+	  "_index" : "website",
+	  "_type" :  "blog",
+	  "_id" :    "124",
+	  "found" :  false
+	}
+
+	(2)返回文档的一部分编辑
+	默认情况下， GET请求会返回整个文档，这个文档正如存储在 _source 字段中的一样。但是也许你只对其中的 title 字段感兴趣。单个字段能用 _source 参数请求得到，多个字段也能使用逗号分隔的列表来指定
+	GET /website/blog/123?_source=title,text
+
+	该 _source 字段现在包含的只是我们请求的那些字段，并且已经将 date 字段过滤掉了。
+	{
+	  "_index" :   "website",
+	  "_type" :    "blog",
+	  "_id" :      "123",
+	  "_version" : 1,
+	  "found" :   true,
+	  "_source" : {
+	      "title": "My first blog entry" ,
+	      "text":  "Just trying this out..."
+	  }
+	}
+
+	(3)或者，如果你只想得到 _source 字段，不需要任何元数据，你能使用 _source 端点：
+	GET /website/blog/123/_source
+	显示响应头部的响应体现在类似这样：
+	{
+	   "title": "My first blog entry",
+	   "text":  "Just trying this out...",
+	   "date":  "2014/01/01"
+	}
+
+4.检查文档是否存在
+	如果只想检查一个文档是否存在 --根本不想关心内容--那么用 HEAD 方法来代替 GET 方法。 HEAD 请求没有返回体，只返回一个 HTTP 请求报头：
+
+	curl -i -XHEAD http://localhost:9200/website/blog/123
+	如果文档存在， Elasticsearch 将返回一个 200 ok 的状态码：
+
+	HTTP/1.1 200 OK
+	Content-Type: text/plain; charset=UTF-8
+	Content-Length: 0
+
+	若文档不存在， Elasticsearch 将返回一个 404 Not Found 的状态码：
+	curl -i -XHEAD http://localhost:9200/website/blog/124
+	
+	HTTP/1.1 404 Not Found
+	Content-Type: text/plain; charset=UTF-8
+	Content-Length: 0
+	当然，一个文档仅仅是在检查的时候不存在，并不意味着一毫秒之后它也不存在：也许同时正好另一个进程就创建了该文档。
+
+5.更新整个文档
+	在 Elasticsearch 中文档是不可改变的，不能修改它们。相反，如果想要更新现有的文档，需要重建索引或者进行替换，我们可以使用相同的 index API 进行实现。
+
+	PUT /website/blog/123
+	{
+	  "title": "My first blog entry",
+	  "text":  "I am starting to get the hang of this...",
+	  "date":  "2014/01/02"
+	}
+	在响应体中，我们能看到 Elasticsearch 已经增加了 _version 字段值：
+
+	{
+	  "_index" :   "website",
+	  "_type" :    "blog",
+	  "_id" :      "123",
+	  "_version" : 2,
+	  "created":   false 
+	}
+
+	created 标志设置成 false ，是因为相同的索引、类型和 ID 的文档已经存在。
+
+6.创建新文档
+	当我们索引一个文档， 怎么确认我们正在创建一个完全新的文档，而不是覆盖现有的呢？
+	请记住， _index 、 _type 和 _id 的组合可以唯一标识一个文档。所以，确保创建一个新文档的最简单办法是，使用索引请求的 POST 形式让 Elasticsearch 自动生成唯一 _id :
+	POST /website/blog/
+	{ ... }
+	然而，如果已经有自己的 _id ，那么我们必须告诉 Elasticsearch ，只有在相同的 _index 、 _type 和 _id 不存在时才接受我们的索引请求。这里有两种方式，他们做的实际是相同的事情。使用哪种，取决于哪种使用起来更方便。
+
+	第一种方法使用 op_type 查询 -字符串参数：
+	PUT /website/blog/123?op_type=create
+	{ ... }
+	第二种方法是在 URL 末端使用 /_create :
+	PUT /website/blog/123/_create
+	{ ... }
+
+	如果创建新文档的请求成功执行，Elasticsearch 会返回元数据和一个 201 Created 的 HTTP 响应码。
+	另一方面，如果具有相同的 _index 、 _type 和 _id 的文档已经存在，Elasticsearch 将会返回 409 Conflict 响应码，以及如下的错误信息：
+
+	{
+	   "error": {
+	      "root_cause": [
+		 {
+		    "type": "document_already_exists_exception",
+		    "reason": "[blog][123]: document already exists",
+		    "shard": "0",
+		    "index": "website"
+		 }
+	      ],
+	      "type": "document_already_exists_exception",
+	      "reason": "[blog][123]: document already exists",
+	      "shard": "0",
+	      "index": "website"
+	   },
+	   "status": 409
+	}
+
+7.删除文档
+	DELETE /website/blog/123
+	如果找到该文档，Elasticsearch 将要返回一个 200 ok 的 HTTP 响应码，和一个类似以下结构的响应体。注意，字段 _version 值已经增加:
+	{
+	  "found" :    true,
+	  "_index" :   "website",
+	  "_type" :    "blog",
+	  "_id" :      "123",
+	  "_version" : 3
+	}
+
+	如果文档没有 找到，我们将得到 404 Not Found 的响应码和类似这样的响应体：
+	{
+	  "found" :    false,
+	  "_index" :   "website",
+	  "_type" :    "blog",
+	  "_id" :      "123",
+	  "_version" : 4
+	}
+	即使文档不存在（ Found 是 false ）， _version 值仍然会增加。这是 Elasticsearch 内部记录本的一部分，用来确保这些改变在跨多节点时以正确的顺序执行。
+
+8.乐观并发控制编辑文档
+	Elasticsearch 是分布式的。当文档创建、更新或删除时， 新版本的文档必须复制到集群中的其他节点。Elasticsearch 也是异步和并发的，这意味着这些复制请求被并行发送，并且到达目的地时也许 顺序是乱的 。 Elasticsearch 需要一种方法确保文档的旧版本不会覆盖新的版本。
+	(1)让我们创建一个新的博客文章：
+	PUT /website/blog/1/_create
+	{
+	  "title": "My first blog entry",
+	  "text":  "Just trying this out..."
+	}
+
+	首先我们检索文档:
+	GET /website/blog/1
+
+	响应体包含相同的 _version 版本号 1 ：
+	{
+	  "_index" :   "website",
+	  "_type" :    "blog",
+	  "_id" :      "1",
+	  "_version" : 1,
+	  "found" :    true,
+	  "_source" :  {
+	      "title": "My first blog entry",
+	      "text":  "Just trying this out..."
+	  }
+	}
+
+	(2)现在，当我们尝试通过重建文档的索引来保存修改，我们指定 version 为我们的修改会被应用的版本：
+	PUT /website/blog/1?version=1 
+	{
+	  "title": "My first blog entry",
+	  "text":  "Starting to get the hang of this..."
+	}
+
+	我们想这个在我们索引中的文档只有现在的 _version 为 1 时，本次更新才能成功。
+	此请求成功，并且响应体告诉我们 _version 已经递增到 2 ：
+	{
+	  "_index":   "website",
+	  "_type":    "blog",
+	  "_id":      "1",
+	  "_version": 2
+	  "created":  false
+	}
+
+	(3)然而，如果我们重新运行相同的索引请求，仍然指定 version=1 ， Elasticsearch 返回 409 Conflict HTTP 响应码，和一个如下所示的响应体：
+	{
+	   "error": {
+	      "root_cause": [
+		 {
+		    "type": "version_conflict_engine_exception",
+		    "reason": "[blog][1]: version conflict, current [2], provided [1]",
+		    "index": "website",
+		    "shard": "3"
+		 }
+	      ],
+	      "type": "version_conflict_engine_exception",
+	      "reason": "[blog][1]: version conflict, current [2], provided [1]",
+	      "index": "website",
+	      "shard": "3"
+	   },
+	   "status": 409
+	}
+	这告诉我们在 Elasticsearch 中这个文档的当前 _version 号是 2 ，但我们指定的更新版本号为 1 。
+
+	(4)通过外部系统使用版本控制
+	要创建一个新的具有外部版本号 5 的博客文章，我们可以按以下方法进行：
+	PUT /website/blog/2?version=5&version_type=external
+	{
+	  "title": "My first external blog entry",
+	  "text":  "Starting to get the hang of this..."
+	}
+
+	在响应中，我们能看到当前的 _version 版本号是 5 ：
+	{
+	  "_index":   "website",
+	  "_type":    "blog",
+	  "_id":      "2",
+	  "_version": 5,
+	  "created":  true
+	}
+
+	现在我们更新这个文档，指定一个新的 version 号是 10 ：
+	PUT /website/blog/2?version=10&version_type=external
+	{
+	  "title": "My first external blog entry",
+	  "text":  "This is a piece of cake..."
+	}
+
+	请求成功并将当前 _version 设为 10 ：
+	{
+	  "_index":   "website",
+	  "_type":    "blog",
+	  "_id":      "2",
+	  "_version": 10,
+	  "created":  false
+	}
+	如果你要重新运行此请求时，它将会失败，并返回像我们之前看到的同样的冲突错误， 因为指定的外部版本号不大于 Elasticsearch 的当前版本号。
+
+9.文档的部分更新
+	POST /website/blog/1/_update
+	{
+	   "doc" : {
+	      "tags" : [ "testing" ],
+	      "views": 0
+	   }
+	}
+
+	如果请求成功，我们看到类似于 index 请求的响应：
+	{
+	   "_index" :   "website",
+	   "_id" :      "1",
+	   "_type" :    "blog",
+	   "_version" : 3
+	}
+
+	检索文档显示了更新后的 _source 字段：
+	{
+	   "_index":    "website",
+	   "_type":     "blog",
+	   "_id":       "1",
+	   "_version":  3,
+	   "found":     true,
+	   "_source": {
+	      "title":  "My first blog entry",
+	      "text":   "Starting to get the hang of this...",
+	      "tags": [ "testing" ], 
+	      "views":  0 
+	   }
+	}
+
+10.取回多个文档
+	(1)mget API 要求有一个 docs 数组作为参数，每个 元素包含需要检索文档的元数据， 包括 _index 、 _type 和 _id 。如果你想检索一个或者多个特定的字段，那么你可以通过 _source 参数来指定这些字段的名字：
+	GET /_mget
+	{
+	   "docs" : [
+	      {
+		 "_index" : "website",
+		 "_type" :  "blog",
+		 "_id" :    2
+	      },
+	      {
+		 "_index" : "website",
+		 "_type" :  "pageviews",
+		 "_id" :    1,
+		 "_source": "views"
+	      }
+	   ]
+	}
+
+	该响应体也包含一个 docs 数组 ， 对于每一个在请求中指定的文档，这个数组中都包含有一个对应的响应，且顺序与请求中的顺序相同。 其中的每一个响应都和使用单个 get request 请求所得到的响应体相同：
+	{
+	   "docs" : [
+	      {
+		 "_index" :   "website",
+		 "_id" :      "2",
+		 "_type" :    "blog",
+		 "found" :    true,
+		 "_source" : {
+		    "text" :  "This is a piece of cake...",
+		    "title" : "My first external blog entry"
+		 },
+		 "_version" : 10
+	      },
+	      {
+		 "_index" :   "website",
+		 "_id" :      "1",
+		 "_type" :    "pageviews",
+		 "found" :    true,
+		 "_version" : 2,
+		 "_source" : {
+		    "views" : 2
+		 }
+	      }
+	   ]
+	}
+
+	(2)如果想检索的数据都在相同的 _index 中（甚至相同的 _type 中），则可以在 URL 中指定默认的 /_index 或者默认的 /_index/_type 。
+	你仍然可以通过单独请求覆盖这些值：
+	GET /website/blog/_mget
+	{
+	   "docs" : [
+	      { "_id" : 2 },
+	      { "_type" : "pageviews", "_id" :   1 }
+	   ]
+	}
+
+	事实上，如果所有文档的 _index 和 _type 都是相同的，你可以只传一个 ids 数组，而不是整个 docs 数组：
+	GET /website/blog/_mget
+	{
+	   "ids" : [ "2", "1" ]
+	}
+
+	注意，我们请求的第二个文档是不存在的。我们指定类型为 blog ，但是文档 ID 1 的类型是 pageviews ，这个不存在的情况将在响应体中被报告：
+	{
+	  "docs" : [
+	    {
+	      "_index" :   "website",
+	      "_type" :    "blog",
+	      "_id" :      "2",
+	      "_version" : 10,
+	      "found" :    true,
+	      "_source" : {
+		"title":   "My first external blog entry",
+		"text":    "This is a piece of cake..."
+	      }
+	    },
+	    {
+	      "_index" :   "website",
+	      "_type" :    "blog",
+	      "_id" :      "1",
+	      "found" :    false  
+	    }
+	  ]
+	}
+
+11.代价较小的批量操作编辑
+	(1)与 mget 可以使我们一次取回多个文档同样的方式， bulk API 允许在单个步骤中进行多次 create 、 index 、 update 或 delete 请求。 如果你需要索引一个数据流比如日志事件，它可以排队和索引数百或数千批次。
+
+	bulk 与其他的请求体格式稍有不同，如下所示：
+	{ action: { metadata }}\n
+	{ request body        }\n
+	{ action: { metadata }}\n
+	{ request body        }\n
+	...
+	这种格式类似一个有效的单行 JSON 文档 流 ，它通过换行符(\n)连接到一起。注意两个要点：
+	1)每行一定要以换行符(\n)结尾， 包括最后一行 。这些换行符被用作一个标记，可以有效分隔行。
+	2)这些行不能包含未转义的换行符，因为他们将会对解析造成干扰。这意味着这个 JSON 不 能使用 pretty 参数打印。
+
+	(2)例如，一个 delete 请求看起来是这样的：
+	{ "delete": { "_index": "website", "_type": "blog", "_id": "123" }}
+	request body 行由文档的 _source 本身组成--文档包含的字段和值。它是 index 和 create 操作所必需的，这是有道理的：你必须提供文档以索引。
+	它也是 update 操作所必需的，并且应该包含你传递给 update API 的相同请求体： doc 、 upsert 、 script 等等。 删除操作不需要 request body 行。
+	{ "create":  { "_index": "website", "_type": "blog", "_id": "123" }}
+	{ "title":    "My first blog post" }
+
+	如果不指定 _id ，将会自动生成一个 ID ：
+	{ "index": { "_index": "website", "_type": "blog" }}
+	{ "title":    "My second blog post" }
+
+	(3)为了把所有的操作组合在一起，一个完整的 bulk 请求 有以下形式:
+	POST /_bulk
+	{ "delete": { "_index": "website", "_type": "blog", "_id": "123" }} 
+	{ "create": { "_index": "website", "_type": "blog", "_id": "123" }}
+	{ "title":    "My first blog post" }
+	{ "index":  { "_index": "website", "_type": "blog" }}
+	{ "title":    "My second blog post" }
+	{ "update": { "_index": "website", "_type": "blog", "_id": "123", "_retry_on_conflict" : 3} }
+	{ "doc" : {"title" : "My updated blog post"} } 
+
+	这个 Elasticsearch 响应包含 items 数组， 这个数组的内容是以请求的顺序列出来的每个请求的结果。
+	{
+	   "took": 4,
+	   "errors": false, 
+	   "items": [
+	      {  "delete": {
+		    "_index":   "website",
+		    "_type":    "blog",
+		    "_id":      "123",
+		    "_version": 2,
+		    "status":   200,
+		    "found":    true
+	      }},
+	      {  "create": {
+		    "_index":   "website",
+		    "_type":    "blog",
+		    "_id":      "123",
+		    "_version": 3,
+		    "status":   201
+	      }},
+	      {  "create": {
+		    "_index":   "website",
+		    "_type":    "blog",
+		    "_id":      "EiwfApScQiiy7TIKFxRCTw",
+		    "_version": 1,
+		    "status":   201
+	      }},
+	      {  "update": {
+		    "_index":   "website",
+		    "_type":    "blog",
+		    "_id":      "123",
+		    "_version": 4,
+		    "status":   200
+	      }}
+	   ]
+	}
+
+12.深入搜索
+	(1)精确值查找
+	term 查询数字编辑
+	我们首先来看最为常用的 term 查询， 可以用它处理数字（numbers）、布尔值（Booleans）、日期（dates）以及文本（text）。
+		1)	
+		POST /my_store/products/_bulk
+		{ "index": { "_id": 1 }}
+		{ "price" : 10, "productID" : "XHDK-A-1293-#fJ3" }
+		{ "index": { "_id": 2 }}
+		{ "price" : 20, "productID" : "KDKE-B-9947-#kL5" }
+		{ "index": { "_id": 3 }}
+		{ "price" : 30, "productID" : "JODL-X-1937-#pV7" }
+		{ "index": { "_id": 4 }}
+		{ "price" : 30, "productID" : "QQPX-R-3956-#aD8" }
+
+		2)我们想要做的是查找具有某个价格的所有产品，有关系数据库背景的人肯定熟悉 SQL，如果我们将其用 SQL 形式表达，会是下面这样：
+		SELECT document
+		FROM   products
+		WHERE  price = 20
+
+		3)我们用 constant_score 将 term 查询转化成为过滤器
+		GET /my_store/products/_search
+		{
+		    "query" : {
+			"constant_score" : { 
+			    "filter" : {
+				"term" : { 
+				    "price" : 20
+				}
+			    }
+			}
+		    }
+		}
+
+		执行结果如下:
+		"hits" : [
+		    {
+			"_index" : "my_store",
+			"_type" :  "products",
+			"_id" :    "2",
+			"_score" : 1.0, 
+			"_source" : {
+			  "price" :     20,
+			  "productID" : "KDKE-B-9947-#kL5"
+			}
+		    }
+		]
+
+	(2)term查询文本
+	SELECT product
+	FROM   products
+	WHERE  productID = "XHDK-A-1293-#fJ3"
+
+	转换成查询表达式（query DSL），同样使用 term 查询，形式如下：
+	GET /my_store/products/_search
+	{
+	    "query" : {
+		"constant_score" : {
+		    "filter" : {
+		        "term" : {
+		            "productID" : "XHDK-A-1293-#fJ3"
+		        }
+		    }
+		}
+	    }
+	}
+
+	(3)组合过滤器
+	SELECT product
+	FROM   products
+	WHERE  (price = 20 OR productID = "XHDK-A-1293-#fJ3")
+	  AND  (price != 30)
+	这种情况下，我们需要 bool （布尔）过滤器。 这是个 复合过滤器（compound filter） ，它可以接受多个其他过滤器作为参数，并将这些过滤器结合成各式各样的布尔（逻辑）组合。
+
+	布尔过滤器编辑
+	一个 bool 过滤器由三部分组成：
+
+	{
+	   "bool" : {
+	      "must" :     [],
+	      "should" :   [],
+	      "must_not" : [],
+	   }
+	}
+	must
+	所有的语句都 必须（must） 匹配，与 AND 等价。
+	must_not
+	所有的语句都 不能（must not） 匹配，与 NOT 等价。
+	should
+	至少有一个语句要匹配，与 OR 等价。
+	就这么简单！ 当我们需要多个过滤器时，只须将它们置入 bool 过滤器的不同部分即可。
+
+	用 Elasticsearch 来表示本部分开始处的 SQL 例子，将两个 term 过滤器置入 bool 过滤器的 should 语句内，再增加一个语句处理 NOT 非的条件：
+
+	GET /my_store/products/_search
+	{
+	   "query" : {
+	      "filtered" : { 
+		 "filter" : {
+		    "bool" : {
+		      "should" : [
+		         { "term" : {"price" : 20}}, 
+		         { "term" : {"productID" : "XHDK-A-1293-#fJ3"}} 
+		      ],
+		      "must_not" : {
+		         "term" : {"price" : 30} 
+		      }
+		   }
+		 }
+	      }
+	   }
+	}
+
+	執行結果如下:
+	"hits" : [
+	    {
+		"_id" :     "1",
+		"_score" :  1.0,
+		"_source" : {
+		  "price" :     10,
+		  "productID" : "XHDK-A-1293-#fJ3" 
+		}
+	    },
+	    {
+		"_id" :     "2",
+		"_score" :  1.0,
+		"_source" : {
+		  "price" :     20, 
+		  "productID" : "KDKE-B-9947-#kL5"
+		}
+	    }
+	]
+
+
+	(3)嵌套布尔过滤器编辑
+	尽管 bool 是一个复合的过滤器，可以接受多个子过滤器，需要注意的是 bool 过滤器本身仍然还只是一个过滤器。 这意味着我们可以将一个 bool 过滤器置于其他 bool 过滤器内部，这为我们提供了对任意复杂布尔逻辑进行处理的能力。
+	对于以下这个 SQL 语句：
+
+	SELECT document
+	FROM   products
+	WHERE  productID      = "KDKE-B-9947-#kL5"
+	  OR (     productID = "JODL-X-1937-#pV7"
+	       AND price     = 30 )
+	我们将其转换成一组嵌套的 bool 过滤器：
+
+	GET /my_store/products/_search
+	{
+	   "query" : {
+	      "filtered" : {
+		 "filter" : {
+		    "bool" : {
+		      "should" : [
+		        { "term" : {"productID" : "KDKE-B-9947-#kL5"}}, 
+		        { "bool" : { 
+		          "must" : [
+		            { "term" : {"productID" : "JODL-X-1937-#pV7"}}, 
+		            { "term" : {"price" : 30}} 
+		          ]
+		        }}
+		      ]
+		   }
+		 }
+	      }
+	   }
+	}
+
+	得到的结果有两个文档，它们各匹配 should 语句中的一个条件：
+
+	"hits" : [
+	    {
+		"_id" :     "2",
+		"_score" :  1.0,
+		"_source" : {
+		  "price" :     20,
+		  "productID" : "KDKE-B-9947-#kL5" 
+		}
+	    },
+	    {
+		"_id" :     "3",
+		"_score" :  1.0,
+		"_source" : {
+		  "price" :      30, 
+		  "productID" : "JODL-X-1937-#pV7" 
+		}
+	    }
+	]
+
+	(4)查找多个精确值
+		1)
+		GET /my_store/products/_search
+		{
+		    "query" : {
+			"constant_score" : {
+			    "filter" : {
+				"terms" : { 
+				    "price" : [20, 30]
+				}
+			    }
+			}
+		    }
+		}
+
+		这个 terms 查询被置于 constant_score 查询中
+		运行结果返回第二、第三和第四个文档：
+
+		"hits" : [
+		    {
+			"_id" :    "2",
+			"_score" : 1.0,
+			"_source" : {
+			  "price" :     20,
+			  "productID" : "KDKE-B-9947-#kL5"
+			}
+		    },
+		    {
+			"_id" :    "3",
+			"_score" : 1.0,
+			"_source" : {
+			  "price" :     30,
+			  "productID" : "JODL-X-1937-#pV7"
+			}
+		    },
+		    {
+			"_id":     "4",
+			"_score":  1.0,
+			"_source": {
+			   "price":     30,
+			   "productID": "QQPX-R-3956-#aD8"
+			}
+		     }
+		]
+
+		2)精确相等
+		{ "tags" : ["search"], "tag_count" : 1 }
+		{ "tags" : ["search", "open_source"], "tag_count" : 2 }
+
+		一旦增加这个用来索引项 term 数目信息的字段，我们就可以构造一个 constant_score 查询，来确保结果中的文档所包含的词项数量与要求是一致的：
+
+		GET /my_index/my_type/_search
+		{
+		    "query": {
+			"constant_score" : {
+			    "filter" : {
+				 "bool" : {
+				    "must" : [
+				        { "term" : { "tags" : "search" } }, 
+				        { "term" : { "tag_count" : 1 } } 
+				    ]
+				}
+			    }
+			}
+		    }
+		}
+
+	(5)范围编辑
+	本章到目前为止，对于数字，只介绍如何处理精确值查询。 实际上，对数字范围进行过滤有时会更有用。例如，我们可能想要查找所有价格大于 $20 且小于 $40 美元的产品。
+	在 SQL 中，范围查询可以表示为：
+
+	SELECT document
+	FROM   products
+	WHERE  price BETWEEN 20 AND 40
+	Elasticsearch 有 range 查询， 不出所料地，可以用它来查找处于某个范围内的文档：
+
+	"range" : {
+	    "price" : {
+		"gte" : 20,
+		"lte" : 40
+	    }
+	}
+	range 查询可同时提供包含（inclusive）和不包含（exclusive）这两种范围表达式，可供组合的选项如下：
+
+	gt: > 大于（greater than）
+	lt: < 小于（less than）
+	gte: >= 大于或等于（greater than or equal to）
+	lte: <= 小于或等于（less than or equal to）
+	下面是一个范围查询的例子：. 
+
+	GET /my_store/products/_search
+	{
+	    "query" : {
+		"constant_score" : {
+		    "filter" : {
+		        "range" : {
+		            "price" : {
+		                "gte" : 20,
+		                "lt"  : 40
+		            }
+		        }
+		    }
+		}
+	    }
+	}	
+
+		1)日期範圍
+		range 查询同样可以应用在日期字段上：
+		"range" : {
+		    "timestamp" : {
+			"gt" : "2014-01-01 00:00:00",
+			"lt" : "2014-01-07 00:00:00"
+		    }
+		}
+
+		当使用它处理日期字段时， range 查询支持对 日期计算（date math） 进行操作，比方说，如果我们想查找时间戳在过去一小时内的所有文档：
+		"range" : {
+		    "timestamp" : {
+			"gt" : "now-1h"
+		    }
+		}
+		这个过滤器会一直查找时间戳在过去一个小时内的所有文档，让过滤器作为一个时间 滑动窗口（sliding window） 来过滤文档。
+		日期计算还可以被应用到某个具体的时间，并非只能是一个像 now 这样的占位符。只要在某个日期后加上一个双管符号 (||) 并紧跟一个日期数学表达式就能做到：
+		"range" : {
+		    "timestamp" : {
+			"gt" : "2014-01-01 00:00:00",
+			"lt" : "2014-01-01 00:00:00||+1M" 
+		    }
+		}
+
+		早于 2014 年 1 月 1 日加 1 月（2014 年 2 月 1 日 零时）
+		日期计算是 日历相关（calendar aware） 的，所以它不仅知道每月的具体天数，还知道某年的总天数（闰年）等信息。
+
+		2)字符串範圍
+		range 查询同样可以处理字符串字段， 字符串范围可采用 字典顺序（lexicographically） 或字母顺序（alphabetically）。例如，下面这些字符串是采用字典序（lexicographically）排序的：
+		5, 50, 6, B, C, a, ab, abb, abc, b
+		
+		如果我们想查找从 a 到 b （不包含）的字符串，同样可以使用 range 查询语法：
+		"range" : {
+		    "title" : {
+			"gte" : "a",
+			"lt" :  "b"
+		    }
+		}
+
+	(6)存在查詢
+		1)
+		POST /my_index/posts/_bulk
+		{ "index": { "_id": "1"              }}
+		{ "tags" : ["search"]                }  
+		{ "index": { "_id": "2"              }}
+		{ "tags" : ["search", "open_source"] }  
+		{ "index": { "_id": "3"              }}
+		{ "other_field" : "some data"        }  
+		{ "index": { "_id": "4"              }}
+		{ "tags" : null                      }  
+		{ "index": { "_id": "5"              }}
+		{ "tags" : ["search", null]          }  
+
+		用 SQL 的话就是用 IS NOT NULL 非空进行查询：
+		SELECT tags
+		FROM   posts
+		WHERE  tags IS NOT NULL
+
+		在 Elasticsearch 中，使用 exists 查询的方式如下：
+		GET /my_index/posts/_search
+		{
+		    "query" : {
+			"constant_score" : {
+			    "filter" : {
+				"exists" : { "field" : "tags" }
+			    }
+			}
+		    }
+		}
+
+		結果如下:
+		"hits" : [
+		    {
+		      "_id" :     "1",
+		      "_score" :  1.0,
+		      "_source" : { "tags" : ["search"] }
+		    },
+		    {
+		      "_id" :     "5",
+		      "_score" :  1.0,
+		      "_source" : { "tags" : ["search", null] } 
+		    },
+		    {
+		      "_id" :     "2",
+		      "_score" :  1.0,
+		      "_source" : { "tags" : ["search", "open source"] }
+		    }
+		]
+
+		2)缺失查詢
+		SELECT tags
+		FROM   posts
+		WHERE  tags IS NUL
+
+		GET /my_index/posts/_search
+		{
+		    "query" : {
+			"constant_score" : {
+			    "filter": {
+				"missing" : { "field" : "tags" }
+			    }
+			}
+		    }
+		}
+
+		結果如下:
+		"hits" : [
+		    {
+		      "_id" :     "3",
+		      "_score" :  1.0,
+		      "_source" : { "other_field" : "some data" }
+		    },
+		    {
+		      "_id" :     "4",
+		      "_score" :  1.0,
+		      "_source" : { "tags" : null }
+		    }
+		]
+
+
+	(7)独立的过滤器缓存编辑
+	属于一个查询组件的 bitsets 是独立于它所属搜索请求其他部分的。这就意味着，一旦被缓存，一个查询可以被用作多个搜索请求。bitsets 并不依赖于它所存在的查询上下文。这样使得缓存可以加速查询中经常使用的部分，从而降低较少、易变的部分所带来的消耗。
+
+	同样，如果单个请求重用相同的非评分查询，它缓存的 bitset 可以被单个搜索里的所有实例所重用。
+
+	在收件箱中，且没有被读过的
+	不在 收件箱中，但被标注重要的
+
+	GET /inbox/emails/_search
+	{
+	  "query": {
+	      "constant_score": {
+		  "filter": {
+		      "bool": {
+		         "should": [
+		            { "bool": {
+		                  "must": [
+		                     { "term": { "folder": "inbox" }}, 
+		                     { "term": { "read": false }}
+		                  ]
+		            }},
+		            { "bool": {
+		                  "must_not": {
+		                     "term": { "folder": "inbox" } 
+		                  },
+		                  "must": {
+		                     "term": { "important": true }
+		                  }
+		            }}
+		         ]
+		      }
+		    }
+		}
+	    }
+	}
+	 
+	两个过滤器是相同的，所以会使用同一 bitset 。
+
+	尽管其中一个收件箱的条件是 must 语句，另一个是 must_not 语句，但他们两者是完全相同的。这意味着在第一个语句执行后， bitset 就会被计算然后缓存起来供另一个使用。当再次执行这个查询时，收件箱的这个过滤器已经被缓存了，所以两个语句都会使用已缓存的 bitset 。
+

@@ -1,0 +1,65 @@
+***elasticsearch版本升级前学要做的准备工作
+1.将数据和日志文件保存到另外目录下:
+	如:原来data目录:/var/lib/elasticsearch 将elasticsearch保存到 --->>/var/ 下 ,并重命名 mv elasticsearch elasticsearch_lib
+	原来log目录:/var/log/elasticsearch 将elasticsearch保存到 --->>/var/ 下 ,并重命名 mv elasticsearch elasticsearch_log
+	
+	将配置文件/etc/elasticsearch 下的elasticsearch.yml 保存到/etc/下
+	以上均是防止升级elasticsearch导致原先配置与数据被删除,而做的准备工作
+2.升级elasticsearch,学要将旧版本的elasticsearch安装包彻底删除干净,不然安装新版本会报错
+	删除安装包的命令: rpm -e '文件名'
+	如:rpm -e elasticsearch-6.0.1-1.noarch
+	查询文件路径的命令:whereis elasticsearch / find '查找范围' '文件名称'
+3.安装最新版本elasticsearch
+	(1)
+	下载:wget https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-6.3.0.rpm
+	解压安装:rpm -ivh elasticsearch-6.3.0.rpm 
+	*若安装失败,尝试下面命令:rpm -ivh elasticsearch-6.3.0.rpm --force --nodeps
+	
+	安装成功后:
+	systemctl daemon-reloa
+	(2)
+	启动并查看安装状态:
+	systemctl start elasticsearch
+
+	systemctl status elasticsearch
+	(3)本地查看版本信息:
+	curl -XGET "IP:9200"
+	(4)查找elasticsearch 安装路径与配置路径，并且配置
+
+	whereis elasticsearch
+
+	cd /etc/elasticsearch
+
+	vim /etc/elasticsearch/elasticsearch.yml
+
+	配置文件可以自己建立文件,这样删除旧的安装包时,配置文件不会被删除,只会被重新命名
+	***配置信息如下:
+	"""	
+	cluster.name: lynews-els                                 # 集群名称
+	node.name: els2                                             # 节点名称，仅仅是描述名称，用于在日志中区分
+	path.data: /var/lib/elasticsearch                           # 数据的默认存放路径
+	path.logs: /var/log/elasticsearch                           # 日志的默认存放路径
+	network.host: 0.0.0.0                                   # 当前节点的IP地址
+	http.port: 9200                                             # 对外提供服务的端口，9300为集群服务的端口
+	discovery.zen.ping.unicast.hosts: ["172.18.113.107"]
+	# 集群个节点IP地址，也可以使用els、els.shuaiguoxia.com等名称，需要各节点能够解析
+	discovery.zen.minimum_master_nodes: 2                      # 为了避免脑裂，集群节点数最少为 半数+1
+	bootstrap.memory_lock: false
+	bootstrap.system_call_filter: false
+	#保证在elasticsearch-head上面能连接服务器ip
+	http.cors.enabled: true
+	http.cors.allow-origin: "*"
+	"""
+	
+	保存退出后重新启动elastic: systemctl restart elasticsearch
+	
+	在浏览器访问虚拟机: ip:9200
+	kibana浏览器地址: ip:5601
+	elasticsearch-head: localhost:9100
+	
+	链接服务器ip,看健康值状态是否为绿色,是则一切正常,如果是黄色,说明有部分/全部副本没有被分配到elasticsearch集群中,只需再添加一个额外的节点或者删除数据目录下的nodes文件夹就ok了,但是切记删除nodes,原来数据就消失了.
+	另外,测试插入一条新的数据后,健康值状态会变为绿色.
+
+	$ curl ip:9200/_cat/health
+	1529550294 23:04:54 lynews-els green 3 3 272 136 0 0 0 0 - 100.0%
+	另外其他关于elasticsearch查询的命令参考链接:https://www.cnblogs.com/xing901022/archive/2016/04/07/5365842.html

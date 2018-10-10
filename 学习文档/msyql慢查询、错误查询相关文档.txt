@@ -1,0 +1,183 @@
+1、准备工作
+    请确保已经安装elasticsearch、kibana、logstash、elasticsearch-head具体的安装方法。。。。。
+    启动elasticsearch的方法，进入到elasticsearch文件夹，执行bin/ealsticsearch
+    启动kibana的方法，进入到kibana文件将爱，执行bin/kibana
+    启动logstash的方法，进入到logstash文件将爱，执行bin/logstash -f xxx.conf
+    启动elasticsearch-head的方法，进入到elasticsearch-head文件将爱，执行npm run start
+
+2、mysql慢查询测试的相关操作
+    分析MySQL语句查询性能的方法除了使用 EXPLAIN 输出执行计划，还可以让MySQL记录下查询超过指定时间的语句，我们将超过指定时间的SQL语句查询称为“慢查询”。
+    查看/设置“慢查询”的时间定义
+
+mysql> show variables like "long%";
++-----------------+----------+
+| Variable_name   | Value    |
++-----------------+----------+
+| long_query_time | 0.000100 |
++-----------------+----------+
+1 row in set (0.00 sec)
+如上述语句输出，“慢查询”的时间定义为0.0001秒（方便测试，一般设置为1-10秒）。使用下面语句定义“慢查询”时间
+1
+2
+mysql> set long_query_time=0.0001;
+Query OK, 0 rows affected (0.00 sec)
+开启“慢查询”记录功能
+
+mysql> show variables like "slow%";
++---------------------+------------------------------------+
+| Variable_name       | Value                              |
++---------------------+------------------------------------+
+| slow_launch_time    | 2                                  |
+| slow_query_log      | OFF                                |
+| slow_query_log_file | /opt/mysql/data/localhost-slow.log |
++---------------------+------------------------------------+
+3 rows in set (0.00 sec)
+上述语句查看“慢查询”的配置信息，你可以自定义日志文件的存放，但必须将 slow_query_log 全局变量设置为“ON”状态，执行以下语句：
+1
+2
+mysql> set global slow_query_log=ON;
+Query OK, 0 rows affected (0.01 sec)
+结果：
+mysql> show variables like "slow%";
++---------------------+------------------------------------+
+| Variable_name       | Value                              |
++---------------------+------------------------------------+
+| slow_launch_time    | 2                                  |
+| slow_query_log      | ON                                 |
+| slow_query_log_file | /opt/mysql/data/localhost-slow.log |
++---------------------+------------------------------------+
+3 rows in set (0.00 sec)
+
+
+默认情况下long_query_time的值为10秒
+select sleep(3);
+
+
+在logstash文件夹下创建xxx.conf,并写入一下内容
+
+filter {
+    grok {
+        match => { "message" =>"SELECT SLEEP" }
+        add_tag => [ "sleep_drop" ]
+        tag_on_failure => [] # prevent default _grokparsefailure tag on real records
+      }
+     if "sleep_drop" in [tags] {
+        drop {}
+     }
+     grok {
+        match => [ "message", "(?m)^# User@Host: %{USER:user}\[[^\]]+\] @ (?:(?<clienthost>\S*) )?\[(?:%{IP:clientip})?\]\s+Id: %{NUMBER:row_id:int}\s*# Query_time: %{NUMBER:query_time:float}\s+Lock_time: %{NUMBER:lock_time:float}\s+Rows_sent: %{NUMBER:rows_sent:int}\s+Rows_examined: %{NUMBER:rows_examined:int}\s*(?:use %{DATA:database};\s*)?SET timestamp=%{NUMBER:timestamp};\s*(?<query>(?<action>\w+)\s+.*)\n#\s*" ]
+      }
+      date {
+        match => [ "timestamp", "UNIX" ]
+        remove_field => [ "timestamp" ]
+      }
+}
+
+
+
+input {
+    file {
+      path => "/var/log/mysql/error.log"
+      type => "error_mysql"
+      start_position => "beginning"
+    }
+}
+ 
+output {
+    elasticsearch {
+       hosts => ["127.0.0.1:9200"]
+       index => "mysql_error-%{+YYYY.MM.dd}"
+    }
+    stdout {
+       codec =>"rubydebug"
+    }
+
+}
+
+
+注意：需要在root账户中运行
+运行：bin/logstash -f xxx.conf
+
+
+3、msyql错误日志查询的相关操作：
+  
+在logstash文件夹下创建xxx.conf,并写入一下内容：
+
+input {
+    file {
+      path => "/var/log/mysql/error.log"
+      type => "error_mysql"
+      start_position => "beginning"
+    }
+}
+
+output {
+    elasticsearch {
+       hosts => ["127.0.0.1:9200"]
+       index => "mysql_error-%{+YYYY.MM.dd}"
+    }
+    stdout {
+       codec =>"rubydebug"
+    }
+
+}
+注意：需要在root账户中运行
+运行：bin/logstash -f xxx.conf
+
+4、在kibana中展示（未完待续）：
+在management中出创建：
+如果是添加上面设置的msyql慢查询日志收集信息，则在下面填写index的名称后边的*必须有；
+然后点击上面的Discover，在Discover中查看就可以了
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

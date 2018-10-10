@@ -1,0 +1,7 @@
+在Galera上查看各集群状态：show global status like 'wsrep_cluster%';
+查看连接的主机：show status like "wsrep_incoming_addresses";
+目前集群机器数： show status like "wsrep_cluster_size";
+查看是否启用galera插件：  show status like "wsrep_ready";
+
+
+

@@ -1,0 +1,198 @@
+一、有关于tornado与elasticsearch交互的问题：
+    1、首先请确保安装如下库：
+        本地安装elasticsearch并开启（如果连接非本地请忽略）
+        tornado
+        torndb
+    2、由于在Python3中没有torndb，需要修改torndb的源码，之后会附上改过之后的源码
+        如果是本地：esclient = Elasticsearch(['localhost:9200'])
+        非本地：esclient = Elasticsearch(['172.18.113.113:9200'])
+
+        tornado_es.py会附上
+
+
+二、关于tornado部署
+
+参考网站：
+    https://blog.csdn.net/sinat_35360663/article/details/78518322
+    
+    https://stackoverflow.com/questions/14479894/stopping-supervisord-shut-down 主要是解决：sudo unlink /tmp/supervisor.sock
+
+ 使用supervisor监控tornado进程
+1. supervisor
+为了统一管理Tornado的多个进程，我们可以借助supervisor工具。
+
+安装
+ yum install supervisor
+配置
+运行echo_supervisord_conf命令输出默认的配置项，可以如下操作将默认配置保存到文件中
+
+echo_supervisord_conf > supervisord.conf
+vim 打开编辑supervisord.conf文件，修改
+
+[include]
+files = relative/directory/*.ini
+为
+
+[include]
+files = /etc/supervisor/*.conf
+include选项指明包含的其他配置文件。
+
+将编辑后的supervisord.conf文件复制到/etc/目录下
+
+sudo cp supervisord.conf /etc/
+然后我们在/etc目录下新建子目录supervisor（与配置文件里的选项相同），并在/etc/supervisor/中新建tornado管理的配置文件tornado.conf。
+
+[group:tornadoes]
+programs=tornado-8001,tornado-8002,tornado-8003,tornado-8004
+
+[program:tornado-8001]
+command=/home/centos/py27env/bin/python /home/centos/tornado_es/tornado_es.py --port=8001
+directory=/home/centos/tornado_es
+user=root
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/home/centos/tornado_es/tornado.log
+loglevel=info
+
+[program:tornado-8002]
+command=/home/centos/py27env/bin/python /home/centos/tornado_es/tornado_es.py --port=8002
+directory=/home/centos/tornado_es
+user=root
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/home/centos/tornado_es/tornado.log
+loglevel=info
+
+[program:tornado-8003]
+command=/home/centos/py27env/bin/python /home/centos/tornado_es/tornado_es.py --port=8003
+directory=/home/centos/tornado_es
+user=root
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/home/centos/tornado_es/tornado.log
+loglevel=info
+
+[program:tornado-8004]
+command=/home/centos/py27env/bin/python /home/centos/tornado_es/tornado_es.py --port=8004
+directory=/home/centos/tornado_es
+user=root
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/home/centos/tornado_es/tornado.log
+loglevel=info
+
+启动
+supervisord -c /etc/supervisord.conf
+查看 supervisord 是否在运行：
+
+ps aux | grep supervisord
+supervisorctl
+我们可以利用supervisorctl来管理supervisor。
+
+supervisorctl
+
+> status    # 查看程序状态
+> stop tornadoes:*   # 关闭 tornadoes组 程序
+> start tornadoes:*  # 启动 tornadoes组 程序
+> restart tornadoes:*    # 重启 tornadoes组 程序
+> update    ＃ 重启配置文件修改过的程序
+执行status命令时，显示如下信息说明tornado程序运行正常：
+
+supervisor> status
+tornadoes:tornado-8001 RUNNING pid 32091, uptime 00:00:02
+tornadoes:tornado-8002 RUNNING pid 32092, uptime 00:00:02
+tornadoes:tornado-8003 RUNNING pid 32093, uptime 00:00:02
+tornadoes:tornado-8004 RUNNING pid 32094, uptime 00:00:02
+2. nginx
+nginx安装以及出现的问题：
+    安装参考：
+    https://blog.csdn.net/oldguncm/article/details/78855000
+    https://blog.csdn.net/wxyjuly/article/details/79443432
+
+    
+    解决nginx报错：Job for nginx.service failed because the control process exited with error code. See "systemctl status nginx.service" and "journalctl -xe" for details.
+    systemctl status nginx.service可以看到具体的错误是什么
+    https://blog.csdn.net/CommShare/article/details/76135928
+
+upstream tornadoes {
+    server 127.0.0.1:8001;
+    server 127.0.0.1:8002;
+    server 127.0.0.1:8003;
+    server 127.0.0.1:8004;
+}
+
+upstream websocket {
+    server 127.0.0.1:8001;
+}
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    location /static/ {
+        root /home/centos/tornado_es;
+        if ($query_string) {
+            expires max;
+        }
+    }
+
+    location /chat {
+        proxy_pass http://websocket/chat;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    location / {
+        proxy_pass_header Server;
+        proxy_set_header Host $http_host;
+        proxy_redirect off;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Scheme $scheme;  # 协议 http https
+        proxy_pass http://tornadoes;
+    }
+}
+
+启动nginx
+
+service nginx start   # 启动
+service nginx stop    # 停止
+service nginx restart # 重启
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
