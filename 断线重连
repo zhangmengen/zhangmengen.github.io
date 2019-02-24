@@ -1,0 +1,8 @@
+def multi_session(session, *arg):
+    retryTimes = 20
+    while retryTimes>0:
+        try:
+            return session.post(*arg)
+        except:
+            print '.',
+            retryTimes -= 1
