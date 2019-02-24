@@ -1,0 +1,12 @@
+def requestPge(self, url):
+# 获得到页面内容
+	req = request.urlopen(url)
+	content = req.read()
+	con = content.decode('utf-8')  # 要根据具体页面的编码格式进行调整解码的的类型
+	return BeautifulSoup(con, 'html5lib')
+
+def parseArea(self, obj):
+# 解析区域的内容
+	if obj:
+		lista = obj.select('ul[class=textlarge22] li a')[1:]
+		listurl = [a.get('href') for a in lista]
